@@ -25,6 +25,11 @@
 
 #include "d3d9_initializer.h"
 
+#include "L4D2VR/game.h"
+#include "L4D2VR/vr.h"
+#include "L4D2VR/sdk/sdk.h"
+#include "d3d9_vr.h"
+
 #include <algorithm>
 #include <cfloat>
 #ifdef MSC_VER
@@ -482,6 +487,12 @@ namespace dxvk {
 
 
   HRESULT STDMETHODCALLTYPE D3D9DeviceEx::Reset(D3DPRESENT_PARAMETERS* pPresentationParameters) {
+    if (g_Game && g_Game->m_VR)
+    {
+        pPresentationParameters->BackBufferWidth = g_Game->m_VR->m_RenderWidth;
+        pPresentationParameters->BackBufferHeight = g_Game->m_VR->m_RenderHeight;
+    }
+
     D3D9DeviceLock lock = LockDevice();
 
     Logger::info("Device reset");
@@ -689,6 +700,22 @@ namespace dxvk {
 
       if (desc.Pool == D3DPOOL_DEFAULT)
         m_losableResourceCounter++;
+
+      if (g_Game && g_Game->m_VR && g_Game->m_VR->m_CreatingTextureID != VR::Texture_None)
+      {
+          SharedTextureHolder* textureTarget;
+          D3D9_TEXTURE_VR_DESC texDesc;
+          VR::TextureID texID = g_Game->m_VR->m_CreatingTextureID;
+
+          textureTarget = g_Game->m_VR->m_TextureMap[texID].SharedTextureHolder;
+          texture.ref()->GetSurfaceLevel(0, g_Game->m_VR->m_TextureMap[texID].surface);
+          g_D3DVR9->GetVRDesc(*g_Game->m_VR->m_TextureMap[texID].surface, &texDesc);
+
+          memcpy(&textureTarget->m_VulkanData, &texDesc, sizeof(vr::VRVulkanTextureData_t));
+          textureTarget->m_VRTexture.handle = &textureTarget->m_VulkanData;
+          textureTarget->m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
+          textureTarget->m_VRTexture.eType = vr::TextureType_Vulkan;
+      }
 
       return D3D_OK;
     }
@@ -2079,6 +2106,14 @@ namespace dxvk {
 
 
   HRESULT STDMETHODCALLTYPE D3D9DeviceEx::SetViewport(const D3DVIEWPORT9* pViewport) {
+    // TODO: Overriding the viewport in-game will mess up the shadows, so only do it in the menu for now.
+    if (g_Game && g_Game->m_VR && !g_Game->m_EngineClient->IsInGame())
+    {
+        D3DVIEWPORT9* newViewport = const_cast<D3DVIEWPORT9*>(pViewport);
+        newViewport->Width = g_Game->m_VR->m_RenderWidth;
+        newViewport->Height = g_Game->m_VR->m_RenderHeight;
+    }
+
     D3D9DeviceLock lock = LockDevice();
 
     if (unlikely(ShouldRecord()))
@@ -4204,12 +4239,21 @@ namespace dxvk {
       }
     }
 
-    return m_implicitSwapchain->Present(
-      pSourceRect,
-      pDestRect,
-      hDestWindowOverride,
-      pDirtyRegion,
-      dwFlags);
+    HRESULT result = m_implicitSwapchain->Present(
+        pSourceRect,
+        pDestRect,
+        hDestWindowOverride,
+        pDirtyRegion,
+        dwFlags);
+
+    
+    if (g_Game && g_Game->m_VR)
+    {
+        g_D3DVR9->WaitDeviceIdle();
+        g_Game->m_VR->Update();
+    }
+
+    return result;
   }
 
 
@@ -8991,5 +9035,4 @@ namespace dxvk {
     else
       return GpuFlushType::ImplicitWeakHint;
   }
-
 }
