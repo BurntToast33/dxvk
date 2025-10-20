@@ -70,6 +70,9 @@ namespace dxvk {
         g_GameCondVar.wait(lock, [] { return g_Game != nullptr; });
     }
 
+    if (!g_Game->m_VrEnabled)
+        return;
+
     if (!m_vr_key && !m_compositor)
       m_compositor = this->getCompositor();
 
