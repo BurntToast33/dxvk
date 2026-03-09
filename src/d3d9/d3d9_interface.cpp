@@ -300,7 +300,8 @@ namespace dxvk {
         {
             char errorString[256];
             snprintf(errorString, 256, "VR_Init failed: %s", vr::VR_GetVRInitErrorAsEnglishDescription(error));
-            MessageBox(0, errorString, "DXVK", MB_ICONERROR | MB_OK);
+
+            MessageBox(0, errorString, "DXVK", MB_ICONERROR | MB_YESNO);
             ExitProcess(0);
         }
     }
@@ -313,6 +314,8 @@ namespace dxvk {
         pPresentationParameters,
         nullptr, // <-- pFullscreenDisplayMode
         reinterpret_cast<IDirect3DDevice9Ex**>(ppReturnedDeviceInterface));
+
+    g_Game->m_DxDevice = static_cast<D3D9DeviceEx*>(*ppReturnedDeviceInterface);
 
     if (g_Game && g_Game->m_VrEnabled)
     {

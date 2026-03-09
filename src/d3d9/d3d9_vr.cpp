@@ -114,31 +114,26 @@ namespace dxvk {
         HRESULT STDMETHODCALLTYPE WaitDeviceIdle()
         {
             m_device->Flush();
+
             // Not clear if we need all here, perhaps...
             m_device->SynchronizeCsThread(DxvkCsThread::SynchronizeAll);
             m_device->GetDXVKDevice()->waitForIdle();
+
             return D3D_OK;
         }
 
         HRESULT STDMETHODCALLTYPE GetBackBufferData(SharedTextureHolder* backBufferData)
         {
-            IDirect3DSurface9 *backBufferSurface;
+            HRESULT res = m_device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &backBufferData->m_Surface);
 
-            HRESULT res = m_device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &backBufferSurface);
-
-            vr::VRVulkanTextureData_t vulkanData;
-            memset(&vulkanData, 0, sizeof(vr::VRVulkanTextureData_t));
-
-            SharedTextureHolder *textureTarget;
             D3D9_TEXTURE_VR_DESC textureDesc;
-            
-            GetVRDesc(backBufferSurface, &textureDesc);
+            GetVRDesc(backBufferData->m_Surface, &textureDesc);
             
             memcpy(&backBufferData->m_VulkanData, &textureDesc, sizeof(vr::VRVulkanTextureData_t));
             backBufferData->m_VRTexture.handle = &backBufferData->m_VulkanData;
             backBufferData->m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
             backBufferData->m_VRTexture.eType = vr::TextureType_Vulkan;
-        
+
             return res;
         }
 

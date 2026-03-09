@@ -701,15 +701,13 @@ namespace dxvk {
       if (desc.Pool == D3DPOOL_DEFAULT)
         m_losableResourceCounter++;
 
-      if (g_Game && g_Game->m_VR && g_Game->m_VR->m_CreatingTextureID != VR::Texture_None)
+      if (g_Game && g_Game->m_VR && g_Game->m_VR->m_CreatingTextureID)
       {
-          SharedTextureHolder* textureTarget;
           D3D9_TEXTURE_VR_DESC texDesc;
-          VR::TextureID texID = g_Game->m_VR->m_CreatingTextureID;
+          SharedTextureHolder* textureTarget = g_Game->m_VR->m_TextureMap[g_Game->m_VR->m_CreatingTextureID];
 
-          textureTarget = g_Game->m_VR->m_TextureMap[texID].SharedTextureHolder;
-          texture.ref()->GetSurfaceLevel(0, g_Game->m_VR->m_TextureMap[texID].surface);
-          g_D3DVR9->GetVRDesc(*g_Game->m_VR->m_TextureMap[texID].surface, &texDesc);
+          texture.ref()->GetSurfaceLevel(0, &textureTarget->m_Surface);
+          g_D3DVR9->GetVRDesc(textureTarget->m_Surface, &texDesc);
 
           memcpy(&textureTarget->m_VulkanData, &texDesc, sizeof(vr::VRVulkanTextureData_t));
           textureTarget->m_VRTexture.handle = &textureTarget->m_VulkanData;
@@ -4246,7 +4244,6 @@ namespace dxvk {
         pDirtyRegion,
         dwFlags);
 
-    
     if (g_Game && g_Game->m_VR)
     {
         g_D3DVR9->WaitDeviceIdle();
