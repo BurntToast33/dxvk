@@ -4237,6 +4237,9 @@ namespace dxvk {
       }
     }
 
+    if (g_Game && g_Game->m_VR)
+        g_Game->m_VR->PreUpdate();
+
     HRESULT result = m_implicitSwapchain->Present(
         pSourceRect,
         pDestRect,
@@ -4247,7 +4250,7 @@ namespace dxvk {
     if (g_Game && g_Game->m_VR)
     {
         g_D3DVR9->WaitDeviceIdle();
-        g_Game->m_VR->Update();
+        g_Game->m_VR->PostUpdate();
     }
 
     return result;
