@@ -507,7 +507,7 @@ namespace dxvk {
 
 
   HRESULT STDMETHODCALLTYPE D3D9DeviceEx::Reset(D3DPRESENT_PARAMETERS* pPresentationParameters) {
-    if (g_Game && g_Game->m_VR)
+    if (g_Game->m_VR)
     {
         pPresentationParameters->BackBufferWidth = g_Game->m_VR->m_RenderWidth;
         pPresentationParameters->BackBufferHeight = g_Game->m_VR->m_RenderHeight;
@@ -675,6 +675,16 @@ namespace dxvk {
     if (unlikely(ppTexture == nullptr))
       return D3DERR_INVALIDCALL;
 
+
+    static bool MSAATex = false;
+    SharedTextureHolder* sharedTexture = nullptr;
+    if (g_Game->m_VR && g_Game->m_VR->m_CreatingTextureID) {
+        auto it = g_Game->m_VR->m_TextureMap.find(g_Game->m_VR->m_CreatingTextureID);
+        if (it != g_Game->m_VR->m_TextureMap.end())
+            sharedTexture = it->second;
+    }
+
+
     D3D9_COMMON_TEXTURE_DESC desc;
     desc.Width              = Width;
     desc.Height             = Height;
@@ -696,11 +706,14 @@ namespace dxvk {
                             || (Usage & D3DUSAGE_DYNAMIC)
                             || IsVendorFormat(EnumerateFormat(Format));
 
-    if (g_Game && g_Game->m_VR && g_Game->m_VR->m_ResolveTex)
+
+    if (sharedTexture && MSAATex)
     {
-        g_Game->logMsg(LOGTYPE_DEBUG, "Creating eye texture with MSAA: %d", g_Game->m_VR->m_AntiAliasing);
+        g_Game->logMsg(LOGTYPE_DEBUG, "Creating eye texture: %d, with MSAA: %d", 
+            g_Game->m_VR->m_CreatingTextureID, g_Game->m_VR->m_AntiAliasing);
         desc.MultiSample = MapToMultisampleType(g_Game->m_VR->m_AntiAliasing);
     }
+
 
     if (FAILED(D3D9CommonTexture::NormalizeTextureProperties(this, D3DRTYPE_TEXTURE, &desc)))
       return D3DERR_INVALIDCALL;
@@ -727,33 +740,33 @@ namespace dxvk {
       if (desc.Pool == D3DPOOL_DEFAULT)
         m_losableResourceCounter++;
 
-      if (g_Game && g_Game->m_VR && !g_Game->m_VR->m_ResolveTex && g_Game->m_VR->m_CreatingTextureID)
+
+      if (sharedTexture && !MSAATex)
       {
           D3D9_TEXTURE_VR_DESC texDesc;
-          SharedTextureHolder* textureTarget = g_Game->m_VR->m_TextureMap[g_Game->m_VR->m_CreatingTextureID];
 
-          texture.ref()->GetSurfaceLevel(0, &textureTarget->m_Surface);
-          g_D3DVR9->GetVRDesc(textureTarget->m_Surface, &texDesc);
+          texture.ref()->GetSurfaceLevel(0, &sharedTexture->m_Surface);
+          g_D3DVR9->GetVRDesc(sharedTexture->m_Surface, &texDesc);
 
-          memcpy(&textureTarget->m_VulkanData, &texDesc, sizeof(vr::VRVulkanTextureData_t));
-          textureTarget->m_VRTexture.handle = &textureTarget->m_VulkanData;
-          textureTarget->m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
-          textureTarget->m_VRTexture.eType = vr::TextureType_Vulkan;
+          memcpy(&sharedTexture->m_VulkanData, &texDesc, sizeof(vr::VRVulkanTextureData_t));
+          sharedTexture->m_VRTexture.handle = &sharedTexture->m_VulkanData;
+          sharedTexture->m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
+          sharedTexture->m_VRTexture.eType = vr::TextureType_Vulkan;
 
-          //Recursively build MSAA targets
-          if (g_Game->m_VR->m_CreatingTextureID == VR::Texture_LeftEye || g_Game->m_VR->m_CreatingTextureID == VR::Texture_RightEye) 
+          if (sharedTexture->m_UseMSAA)
           {
-              g_Game->m_VR->m_ResolveTex = true;
-              IDirect3DTexture9* temp;
-              CreateTexture(Width, Height, Levels, Usage, Format, Pool, &temp, 0);
-              g_Game->m_VR->m_ResolveTex = false;
+              IDirect3DTexture9* temp = nullptr;
+              MSAATex = true;
+              CreateTexture(Width, Height, Levels, Usage, Format, Pool, &temp, nullptr);
+              MSAATex = false;
+
+              temp->GetSurfaceLevel(0, &sharedTexture->m_MSAASurface);
+              temp->Release();
           }
-      }
-      else if (g_Game && g_Game->m_VR && g_Game->m_VR->m_ResolveTex)
-      {
-          SharedTextureHolder* textureTarget = g_Game->m_VR->m_TextureMap[g_Game->m_VR->m_CreatingTextureID];
-          texture.ref()->GetSurfaceLevel(0, &textureTarget->m_MSAASurface);
-      }
+
+          if (sharedTexture->m_CustomSetup)
+              sharedTexture->m_CustomSetup(Width, Height, Levels, Usage, Format, Pool);
+      }          
 
       return D3D_OK;
     }
@@ -2145,7 +2158,7 @@ namespace dxvk {
 
   HRESULT STDMETHODCALLTYPE D3D9DeviceEx::SetViewport(const D3DVIEWPORT9* pViewport) {
     // TODO: Overriding the viewport in-game will mess up the shadows, so only do it in the menu for now.
-    if (g_Game && g_Game->m_VR && !g_Game->m_EngineClient->IsInGame())
+    if (g_Game->m_VR && !g_Game->m_EngineClient->IsInGame())
     {
         D3DVIEWPORT9* newViewport = const_cast<D3DVIEWPORT9*>(pViewport);
         newViewport->Width = g_Game->m_VR->m_RenderWidth;
@@ -4277,7 +4290,7 @@ namespace dxvk {
       }
     }
 
-    if (g_Game && g_Game->m_VR)
+    if (g_Game->m_VR)
         g_Game->m_VR->PreUpdate();
 
     HRESULT result = m_implicitSwapchain->Present(
@@ -4287,7 +4300,7 @@ namespace dxvk {
         pDirtyRegion,
         dwFlags);
 
-    if (g_Game && g_Game->m_VR)
+    if (g_Game->m_VR)
     {
         if (g_Game->m_VR->m_AntiAliasing) 
         {
