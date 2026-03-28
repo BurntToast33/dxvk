@@ -40,6 +40,8 @@
 #include "../util/util_flush.h"
 #include "../util/util_lru.h"
 
+class SharedTextureHolder;
+
 namespace dxvk {
 
   class D3D9InterfaceEx;
@@ -1562,6 +1564,8 @@ namespace dxvk {
     }
 
     GpuFlushType GetMaxFlushType() const;
+
+    void ResolveImage(SharedTextureHolder* src, VkResolveModeFlagBits colorMode, VkResolveModeFlagBits stencilMode);
 
     Com<D3D9InterfaceEx>            m_parent;
     D3DDEVTYPE                      m_deviceType;

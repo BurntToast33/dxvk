@@ -745,15 +745,16 @@ namespace dxvk {
       {
           D3D9_TEXTURE_VR_DESC texDesc;
 
-          texture.ref()->GetSurfaceLevel(0, &sharedTexture->m_Surface);
+          texture->GetSurfaceLevel(0, &sharedTexture->m_Surface);
           g_D3DVR9->GetVRDesc(sharedTexture->m_Surface, &texDesc);
+          sharedTexture->m_SurfaceImage = texture->GetCommonTexture()->GetImage();
 
           memcpy(&sharedTexture->m_VulkanData, &texDesc, sizeof(vr::VRVulkanTextureData_t));
           sharedTexture->m_VRTexture.handle = &sharedTexture->m_VulkanData;
           sharedTexture->m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
           sharedTexture->m_VRTexture.eType = vr::TextureType_Vulkan;
 
-          if (sharedTexture->m_UseMSAA)
+          if (sharedTexture->m_UseMSAA && !sharedTexture->m_MSAASurface)
           {
               IDirect3DTexture9* temp = nullptr;
               MSAATex = true;
@@ -761,6 +762,7 @@ namespace dxvk {
               MSAATex = false;
 
               temp->GetSurfaceLevel(0, &sharedTexture->m_MSAASurface);
+              sharedTexture->m_MSAASurfaceImage = texture->GetCommonTexture()->GetImage();
               temp->Release();
           }
 
@@ -4291,7 +4293,20 @@ namespace dxvk {
     }
 
     if (g_Game->m_VR)
+    {
+        if (g_Game->m_VR->m_AntiAliasing)
+        {
+            for (int I = 1; I < VR::Texture_Count; I++) 
+            {
+                auto it = g_Game->m_VR->m_TextureMap.find((VR::TextureID)I);
+                if (it->second->m_UseMSAA)
+                    ResolveImage(it->second, VK_RESOLVE_MODE_SAMPLE_ZERO_BIT, VK_RESOLVE_MODE_NONE);
+            }
+        }
+
         g_Game->m_VR->PreUpdate();
+    }
+        
 
     HRESULT result = m_implicitSwapchain->Present(
         pSourceRect,
@@ -4302,15 +4317,6 @@ namespace dxvk {
 
     if (g_Game->m_VR)
     {
-        if (g_Game->m_VR->m_AntiAliasing) 
-        {
-            SharedTextureHolder* right = &g_Game->m_VR->m_RightEye;
-            SharedTextureHolder* left = &g_Game->m_VR->m_LeftEye;
-
-            StretchRect(right->m_MSAASurface, nullptr, right->m_Surface, nullptr, D3DTEXF_NONE);
-            StretchRect(left->m_MSAASurface, nullptr, left->m_Surface, nullptr, D3DTEXF_NONE);
-        }
-
         g_D3DVR9->WaitDeviceIdle();
         g_Game->m_VR->PostUpdate();
     }
@@ -9096,5 +9102,24 @@ namespace dxvk {
       return GpuFlushType::ImplicitStrongHint;
     else
       return GpuFlushType::ImplicitWeakHint;
+  }
+
+  void D3D9DeviceEx::ResolveImage(SharedTextureHolder* src, VkResolveModeFlagBits colorMode, VkResolveModeFlagBits stencilMode)
+  {
+      static VkImageResolve region = []() {
+          VkImageResolve r = {};
+          r.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+          r.dstSubresource = r.srcSubresource;
+          r.extent.depth = 1;
+          return r;
+      }();
+
+      region.extent.width = src->m_VulkanData.m_nWidth;
+      region.extent.height = src->m_VulkanData.m_nHeight;
+      
+
+      EmitCs([src, Region = region, colorMode, stencilMode](DxvkContext* ctx) {
+          ctx->resolveImage(src->m_SurfaceImage, src->m_MSAASurfaceImage, region, src->m_MSAASurfaceImage->info().format, colorMode, stencilMode);
+      });
   }
 }
