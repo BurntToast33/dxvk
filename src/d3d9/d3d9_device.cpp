@@ -685,7 +685,7 @@ namespace dxvk {
         std::pair<bool, SharedTextureHolder*> temp = g_Game->m_VR->PopNextTexture();
         isMSAA = temp.first;
         sharedTexture = temp.second;
-        //if (sharedTexture && sharedTexture->m_UseMSAA) m_ResolveQueue.RegisterTexture(sharedTexture);
+        if (sharedTexture && sharedTexture->m_UseMSAA) m_ResolveQueue.RegisterTexture(sharedTexture);
     }
 
 
