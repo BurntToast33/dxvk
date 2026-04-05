@@ -11,23 +11,13 @@ class D3D9DeviceEx;
 class SharedTextureHolder;
 inline IDirect3DVR9 *g_D3DVR9;
 
-struct D3D9_TEXTURE_VR_DESC {
-    uint64_t         Image;
-    VkDevice         Device;
-    VkPhysicalDevice PhysicalDevice;
-    VkInstance       Instance;
-    VkQueue          Queue;
-    uint32_t         QueueFamilyIndex;
-
-    uint32_t         Width;
-    uint32_t         Height;
-    VkFormat         Format;
-    uint32_t         SampleCount;
-};
+namespace vr {
+    struct VRVulkanTextureData_t;
+}
 
 MIDL_INTERFACE("7e272b32-a49c-46c7-b1a4-ef52936bec87")
 IDirect3DVR9 : public IUnknown{
-  virtual HRESULT STDMETHODCALLTYPE GetVRDesc(IDirect3DSurface9 * pSurface, D3D9_TEXTURE_VR_DESC * pDesc) = 0;
+  virtual HRESULT STDMETHODCALLTYPE GetVRDesc(IDirect3DSurface9 * pSurface, vr::VRVulkanTextureData_t * pDesc) = 0;
   virtual HRESULT STDMETHODCALLTYPE TransferSurface(IDirect3DSurface9 *pSurface, BOOL waitResourceIdle) = 0;
   virtual HRESULT STDMETHODCALLTYPE LockDevice() = 0;
   virtual HRESULT STDMETHODCALLTYPE UnlockDevice() = 0;

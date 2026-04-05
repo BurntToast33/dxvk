@@ -40,7 +40,7 @@
 #include "../util/util_flush.h"
 #include "../util/util_lru.h"
 
-class SharedTextureHolder;
+struct SharedTextureHolder;
 
 namespace dxvk {
 

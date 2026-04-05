@@ -9,6 +9,7 @@
 
 #include "L4D2VR/game.h"
 #include "L4D2VR/vr.h"
+#include "openvr.h"
 
 namespace dxvk {
 
@@ -42,7 +43,7 @@ namespace dxvk {
 
         HRESULT STDMETHODCALLTYPE GetVRDesc(
             IDirect3DSurface9 *pSurface,
-            D3D9_TEXTURE_VR_DESC *pDesc)
+            vr::VRVulkanTextureData_t *pDesc)
         {
             if (unlikely(pSurface == nullptr || pDesc == nullptr))
                 return D3DERR_INVALIDCALL;
@@ -56,17 +57,17 @@ namespace dxvk {
             const auto &device = tex->Device()->GetDXVKDevice();
 
             // I don't know why the image randomly is a uint64_t in OpenVR.
-            pDesc->Image = uint64_t(image->handle());
-            pDesc->Device = device->handle();
-            pDesc->PhysicalDevice = device->adapter()->handle();
-            pDesc->Instance = device->instance()->handle();
-            pDesc->Queue = device->queues().graphics.queueHandle;
-            pDesc->QueueFamilyIndex = device->queues().graphics.queueIndex;
+            pDesc->m_nImage = uint64_t(image->handle());
+            pDesc->m_pDevice = device->handle();
+            pDesc->m_pPhysicalDevice = device->adapter()->handle();
+            pDesc->m_pInstance = device->instance()->handle();
+            pDesc->m_pQueue = device->queues().graphics.queueHandle;
+            pDesc->m_nQueueFamilyIndex = device->queues().graphics.queueIndex;
 
-            pDesc->Width = desc->Width;
-            pDesc->Height = desc->Height;
-            pDesc->Format = tex->GetFormatMapping().FormatColor;
-            pDesc->SampleCount = uint32_t(image->info().sampleCount);
+            pDesc->m_nWidth = desc->Width;
+            pDesc->m_nHeight = desc->Height;
+            pDesc->m_nFormat = tex->GetFormatMapping().FormatColor;
+            pDesc->m_nSampleCount = uint32_t(image->info().sampleCount);
 
             return D3D_OK;
         }
@@ -126,10 +127,7 @@ namespace dxvk {
         {
             HRESULT res = m_device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &backBufferData->m_Surface);
 
-            D3D9_TEXTURE_VR_DESC textureDesc;
-            GetVRDesc(backBufferData->m_Surface, &textureDesc);
-            
-            memcpy(&backBufferData->m_VulkanData, &textureDesc, sizeof(vr::VRVulkanTextureData_t));
+            GetVRDesc(backBufferData->m_Surface, &backBufferData->m_VulkanData);
             backBufferData->m_VRTexture.handle = &backBufferData->m_VulkanData;
             backBufferData->m_VRTexture.eColorSpace = vr::ColorSpace_Auto;
             backBufferData->m_VRTexture.eType = vr::TextureType_Vulkan;

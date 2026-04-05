@@ -287,6 +287,8 @@ namespace dxvk {
     {
         vr::HmdError error = vr::VRInitError_None;
         vr::IVRSystem* system = vr::VR_Init(&error, vr::VRApplication_Scene);
+        g_Game->m_WindowWidth = pPresentationParameters->BackBufferWidth;
+        g_Game->m_WindowHeight = pPresentationParameters->BackBufferHeight;
 
         if (error == vr::VRInitError_None)
         {
