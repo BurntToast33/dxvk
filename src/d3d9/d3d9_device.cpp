@@ -685,7 +685,8 @@ namespace dxvk {
         std::pair<bool, SharedTextureHolder*> temp = g_Game->m_VR->PopNextTexture();
         isMSAA = temp.first;
         sharedTexture = temp.second;
-        if (sharedTexture && sharedTexture->m_UseMSAA) m_ResolveQueue.RegisterTexture(sharedTexture);
+
+        if (sharedTexture && isMSAA) m_ResolveQueue.RegisterTexture(sharedTexture);
     }
 
 
@@ -4292,7 +4293,7 @@ namespace dxvk {
         {
             for (SharedTextureHolder* tex : m_ResolveQueue.m_textures)
             {
-                ResolveImage(tex, VK_RESOLVE_MODE_SAMPLE_ZERO_BIT, VK_RESOLVE_MODE_NONE);
+                ResolveImage(tex, VK_RESOLVE_MODE_AVERAGE_BIT, VK_RESOLVE_MODE_SAMPLE_ZERO_BIT);
             }
         }
 
@@ -7472,12 +7473,32 @@ namespace dxvk {
     D3D9CommonTexture* commonTex =
       GetCommonTexture(m_state.textures[StateSampler]);
 
-    Rc<DxvkImageView> imageView = commonTex->GetSampleView(srgb);
+    auto imageView = commonTex->GetSampleView(srgb);
 
-    EmitCs([
-      cSlot = slot,
-      cImageView = std::move(imageView)
-    ](DxvkContext* ctx) mutable {
+    auto image = commonTex->GetImage();
+
+    // Can only bind a non-multisampled texture.
+    // otherwise we need to resolve.
+    bool needsResolve = image != nullptr && image->info().sampleCount != VK_SAMPLE_COUNT_1_BIT;
+
+    if (needsResolve) {
+        const DxvkFormatInfo* formatInfo = lookupFormatInfo(image->info().format);
+        const VkImageSubresource subresource = commonTex->GetSubresourceFromIndex(formatInfo->aspectMask, 0);
+        VkImageResolve region;
+        region.srcSubresource = { subresource.aspectMask, subresource.mipLevel, subresource.arrayLayer, 1 };
+        region.srcOffset = { 0, 0, 0 };
+        region.dstSubresource = region.srcSubresource;
+        region.dstOffset = { 0, 0, 0 };
+        region.extent = image->info().extent;
+
+        EmitCs([cDstImage = commonTex->GetResolveImage(), cSrcImage = image, cRegion = region](DxvkContext* ctx) {
+            ctx->resolveImage(cDstImage, cSrcImage, cRegion, cSrcImage->info().format, VK_RESOLVE_MODE_AVERAGE_BIT, VK_RESOLVE_MODE_AVERAGE_BIT);
+        });
+
+        imageView = commonTex->GetResolveView(srgb);
+    }
+
+    EmitCs([cSlot = slot, cImageView = std::move(imageView)](DxvkContext* ctx) mutable {
       VkShaderStageFlags stage = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
       ctx->bindResourceImageView(stage, cSlot, std::move(cImageView));
     });
@@ -9096,22 +9117,42 @@ namespace dxvk {
       return GpuFlushType::ImplicitWeakHint;
   }
 
-  void D3D9DeviceEx::ResolveImage(SharedTextureHolder* src, VkResolveModeFlagBits colorMode, VkResolveModeFlagBits stencilMode)
+  void D3D9DeviceEx::ResolveImage(SharedTextureHolder* holder, VkResolveModeFlagBits colorMode, VkResolveModeFlagBits stencilMode)
   {
-      static VkImageResolve region = []() {
-          VkImageResolve r = {};
-          r.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-          r.dstSubresource = r.srcSubresource;
-          r.extent.depth = 1;
-          return r;
-      }();
+      D3D9Surface* dst = static_cast<D3D9Surface*>(holder->m_Surface);
+      D3D9Surface* src = static_cast<D3D9Surface*>(holder->m_MSAASurface);
 
-      region.extent.width = src->m_VulkanData.m_nWidth;
-      region.extent.height = src->m_VulkanData.m_nHeight;
+      D3D9CommonTexture* dstTextureInfo = dst->GetCommonTexture();
+      D3D9CommonTexture* srcTextureInfo = src->GetCommonTexture();
+
+      const DxvkFormatInfo* dstFormatInfo = lookupFormatInfo(holder->m_SurfaceImage->info().format);
+      const DxvkFormatInfo* srcFormatInfo = lookupFormatInfo(holder->m_MSAASurfaceImage->info().format);
+
+      const VkImageSubresource dstSubresource = dstTextureInfo->GetSubresourceFromIndex(dstFormatInfo->aspectMask, dst->GetSubresource());
+      const VkImageSubresource srcSubresource = srcTextureInfo->GetSubresourceFromIndex(srcFormatInfo->aspectMask, src->GetSubresource());
+
+      VkImageSubresourceLayers dstSubresourceLayers = {
+      dstSubresource.aspectMask,
+      dstSubresource.mipLevel,
+      dstSubresource.arrayLayer, 1 };
+
+      VkImageSubresourceLayers srcSubresourceLayers = {
+        srcSubresource.aspectMask,
+        srcSubresource.mipLevel,
+        srcSubresource.arrayLayer, 1 };
+
+      VkImageResolve region = {};
+      region.srcSubresource = srcSubresourceLayers;
+      region.dstSubresource = dstSubresourceLayers;
+      region.srcOffset = { 0, 0, 0 };
+      region.dstOffset = { 0, 0, 0 };
+      region.extent.width = holder->m_MSAASurfaceImage->info().extent.width;
+      region.extent.height = holder->m_MSAASurfaceImage->info().extent.height;
+      region.extent.depth = 1;
       
 
-      EmitCs([src, Region = region, colorMode, stencilMode](DxvkContext* ctx) {
-          ctx->resolveImage(src->m_SurfaceImage, src->m_MSAASurfaceImage, region, src->m_MSAASurfaceImage->info().format, colorMode, stencilMode);
+      EmitCs([holder, region, colorMode, stencilMode](DxvkContext* ctx) {
+          ctx->resolveImage(holder->m_SurfaceImage, holder->m_MSAASurfaceImage, region, holder->m_MSAASurfaceImage->info().format, colorMode, stencilMode);
       });
   }
 }
