@@ -679,14 +679,14 @@ namespace dxvk {
 
 
     SharedTextureHolder* sharedTexture = nullptr;
-    bool isMSAA = false;
+    int isMSAA = false;
     if (g_Game->m_VR)
     {
-        std::pair<bool, SharedTextureHolder*> temp = g_Game->m_VR->PopNextTexture();
+        std::pair<int, SharedTextureHolder*> temp = g_Game->m_VR->PopNextTexture();
         isMSAA = temp.first;
         sharedTexture = temp.second;
 
-        if (sharedTexture && isMSAA) m_ResolveQueue.RegisterTexture(sharedTexture);
+        if (sharedTexture && isMSAA == 1) m_ResolveQueue.RegisterTexture(sharedTexture);
     }
 
 
@@ -712,7 +712,7 @@ namespace dxvk {
                             || IsVendorFormat(EnumerateFormat(Format));
 
 
-    if (sharedTexture && isMSAA)
+    if (sharedTexture && isMSAA == 1)
     {
         g_Game->logMsg(LOGTYPE_DEBUG, "Creating texture with MSAA: %d", g_Game->m_VR->m_AntiAliasing);
         desc.MultiSample = MapToMultisampleType(g_Game->m_VR->m_AntiAliasing);
@@ -4293,7 +4293,7 @@ namespace dxvk {
         {
             for (SharedTextureHolder* tex : m_ResolveQueue.m_textures)
             {
-                ResolveImage(tex, VK_RESOLVE_MODE_AVERAGE_BIT, VK_RESOLVE_MODE_SAMPLE_ZERO_BIT);
+                ResolveImage(tex, VK_RESOLVE_MODE_AVERAGE_BIT, VK_RESOLVE_MODE_NONE);
             }
         }
 
