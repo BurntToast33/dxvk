@@ -15,14 +15,24 @@ namespace vr {
     struct VRVulkanTextureData_t;
 }
 
+#define FVF_CUSTOM (D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1)
+
 MIDL_INTERFACE("7e272b32-a49c-46c7-b1a4-ef52936bec87")
 IDirect3DVR9 : public IUnknown{
+    struct Vertex
+    {
+        float x, y, z, rhw;
+        DWORD color;
+        float u, v;
+    };
+
   virtual HRESULT STDMETHODCALLTYPE GetVRDesc(IDirect3DSurface9 * pSurface, vr::VRVulkanTextureData_t * pDesc) = 0;
   virtual HRESULT STDMETHODCALLTYPE TransferSurface(IDirect3DSurface9 *pSurface, BOOL waitResourceIdle) = 0;
   virtual HRESULT STDMETHODCALLTYPE LockDevice() = 0;
   virtual HRESULT STDMETHODCALLTYPE UnlockDevice() = 0;
   virtual HRESULT STDMETHODCALLTYPE WaitDeviceIdle() = 0;
   virtual HRESULT STDMETHODCALLTYPE GetBackBufferData(SharedTextureHolder *backBufferData) = 0;
+  virtual void RenderTextureToRenderTargetWithAlpha(LPDIRECT3DTEXTURE9 texture, float width, float height) = 0;
 };
 
 #ifdef _MSC_VER

@@ -135,6 +135,26 @@ namespace dxvk {
             return res;
         }
 
+        void RenderTextureToRenderTargetWithAlpha(LPDIRECT3DTEXTURE9 texture, float width, float height)
+        {
+            if (!texture || !m_device)
+                return;
+
+            m_device->SetPixelShader(NULL);
+            m_device->SetTexture(0, texture);
+            m_device->SetFVF(FVF_CUSTOM);
+
+            Vertex v[] =
+            {
+                { 0,       0,        0.0f, 1.0f, 0xFFFFFFFF, 0.0f, 0.0f },
+                { width,   0,        0.0f, 1.0f, 0xFFFFFFFF, 1.0f, 0.0f },
+                { 0,       height,   0.0f, 1.0f, 0xFFFFFFFF, 0.0f, 1.0f },
+                { width,   height,   0.0f, 1.0f, 0xFFFFFFFF, 1.0f, 1.0f },
+            };
+
+            m_device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, v, sizeof(Vertex));
+        }
+
     private:
         D3D9DeviceEx *m_device;
         D3D9DeviceLock m_lock;
