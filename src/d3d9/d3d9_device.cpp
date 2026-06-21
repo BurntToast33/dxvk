@@ -686,7 +686,7 @@ namespace dxvk {
         isMSAA = temp.first;
         sharedTexture = temp.second;
 
-        if (sharedTexture && isMSAA == 1) m_ResolveQueue.RegisterTexture(sharedTexture);
+        if (sharedTexture && isMSAA) m_ResolveQueue.RegisterTexture(sharedTexture);
     }
 
 
@@ -712,7 +712,7 @@ namespace dxvk {
                             || IsVendorFormat(EnumerateFormat(Format));
 
 
-    if (sharedTexture && isMSAA == 1)
+    if (sharedTexture && isMSAA)
     {
         g_Game->logMsg(LOGTYPE_DEBUG, "Creating texture with MSAA: %d", g_Game->m_VR->m_AntiAliasing);
         desc.MultiSample = MapToMultisampleType(g_Game->m_VR->m_AntiAliasing);
