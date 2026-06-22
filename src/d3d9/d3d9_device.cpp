@@ -746,14 +746,11 @@ namespace dxvk {
 
       if (sharedTexture)
       {
-          IDirect3DSurface9* tempSurface = nullptr;
-          texture.ref()->GetSurfaceLevel(0, &tempSurface);
-
-          IDirect3DSurface9*& targetSurface = (isMSAA) ? sharedTexture->m_MSAASurface : sharedTexture->m_Surface;
-          targetSurface = tempSurface;
-
           IDirect3DTexture9*& targetTexture = (isMSAA) ? sharedTexture->m_MSAATexture : sharedTexture->m_Texture;
           targetTexture = *ppTexture;
+
+          IDirect3DSurface9*& targetSurface = (isMSAA) ? sharedTexture->m_MSAASurface : sharedTexture->m_Surface;
+          targetTexture->GetSurfaceLevel(0, &targetSurface);
 
           Rc<DxvkImage>& targetImage = (isMSAA) ? sharedTexture->m_MSAASurfaceImage : sharedTexture->m_SurfaceImage;
           targetImage = texture->GetCommonTexture()->GetImage();
