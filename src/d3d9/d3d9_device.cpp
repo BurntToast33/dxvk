@@ -677,9 +677,8 @@ namespace dxvk {
     if (unlikely(ppTexture == nullptr))
       return D3DERR_INVALIDCALL;
 
-
+    int isMSAA = 0;
     SharedTextureHolder* sharedTexture = nullptr;
-    int isMSAA = false;
     if (g_Game->m_VR && g_Game->m_VR->m_IsInitialized)
     {
         std::pair<int, SharedTextureHolder*> temp = g_Game->m_VR->PopNextTexture();
