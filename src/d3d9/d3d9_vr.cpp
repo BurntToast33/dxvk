@@ -135,6 +135,7 @@ namespace dxvk {
             return res;
         }
 
+        //The way this handles states is risky, what ever changed settings last will effect this
         void RenderTextureToRenderTargetWithAlpha(LPDIRECT3DTEXTURE9 texture, float width, float height)
         {
             if (!texture || !m_device)
@@ -144,13 +145,18 @@ namespace dxvk {
             m_device->SetTexture(0, texture);
             m_device->SetFVF(FVF_CUSTOM);
 
-            Vertex v[] =
+            static Vertex v[4] =
             {
-                { 0,       0,        0.0f, 1.0f, 0xFFFFFFFF, 0.0f, 0.0f },
-                { width,   0,        0.0f, 1.0f, 0xFFFFFFFF, 1.0f, 0.0f },
-                { 0,       height,   0.0f, 1.0f, 0xFFFFFFFF, 0.0f, 1.0f },
-                { width,   height,   0.0f, 1.0f, 0xFFFFFFFF, 1.0f, 1.0f },
+                { 0.0f, 0.0f, 0.0f, 1.0f, 0xFFFFFFFF, 0.0f, 0.0f },
+                { 0.0f, 0.0f, 0.0f, 1.0f, 0xFFFFFFFF, 1.0f, 0.0f },
+                { 0.0f, 0.0f, 0.0f, 1.0f, 0xFFFFFFFF, 0.0f, 1.0f },
+                { 0.0f, 0.0f, 0.0f, 1.0f, 0xFFFFFFFF, 1.0f, 1.0f },
             };
+
+            v[1].x = width;
+            v[2].y = height;
+            v[3].x = width;
+            v[3].y = height;
 
             m_device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, v, sizeof(Vertex));
         }
