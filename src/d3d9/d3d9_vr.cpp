@@ -11,6 +11,117 @@
 #include "L4D2VR/vr.h"
 #include "openvr.h"
 
+void DumpRenderStates(IDirect3DDevice9* device)
+{
+    for (int i = 0; i < D3DRS_BLENDOPALPHA + 1; i++)
+    {
+        DWORD value = 0;
+
+        if (SUCCEEDED(device->GetRenderState(
+            (D3DRENDERSTATETYPE)i,
+            &value)))
+        {
+            printf("RS[%d] = 0x%08X\n", i, value);
+        }
+    }
+}
+
+void DumpShaderStates(IDirect3DDevice9* device)
+{
+    printf("==== Shader State Dump ====\n");
+
+    // Pixel Shader
+    IDirect3DPixelShader9* ps = nullptr;
+    HRESULT hr = device->GetPixelShader(&ps);
+
+    if (SUCCEEDED(hr))
+    {
+        printf("Pixel Shader: %p\n", ps);
+
+        if (ps)
+        {
+            UINT size = 0;
+            ps->GetFunction(nullptr, &size);
+
+            printf("Pixel Shader bytecode size: %u bytes\n", size);
+
+            ps->Release();
+        }
+        else
+        {
+            printf("Pixel Shader: NULL (fixed function)\n");
+        }
+    }
+
+    // Vertex Shader
+    IDirect3DVertexShader9* vs = nullptr;
+    hr = device->GetVertexShader(&vs);
+
+    if (SUCCEEDED(hr))
+    {
+        printf("Vertex Shader: %p\n", vs);
+
+        if (vs)
+        {
+            UINT size = 0;
+            vs->GetFunction(nullptr, &size);
+
+            printf("Vertex Shader bytecode size: %u bytes\n", size);
+
+            vs->Release();
+        }
+        else
+        {
+            printf("Vertex Shader: NULL\n");
+        }
+    }
+
+    // Vertex Declaration
+    IDirect3DVertexDeclaration9* decl = nullptr;
+    hr = device->GetVertexDeclaration(&decl);
+
+    if (SUCCEEDED(hr))
+    {
+        printf("Vertex Declaration: %p\n", decl);
+
+        if (decl)
+        {
+            D3DVERTEXELEMENT9 elements[64];
+            UINT count = 0;
+
+            if (SUCCEEDED(decl->GetDeclaration(elements, &count)))
+            {
+                printf("Vertex Elements: %u\n", count);
+
+                for (UINT i = 0; i < count; i++)
+                {
+                    printf(
+                        "  [%u] Stream=%u Offset=%u Type=%u Method=%u Usage=%u UsageIndex=%u\n",
+                        i,
+                        elements[i].Stream,
+                        elements[i].Offset,
+                        elements[i].Type,
+                        elements[i].Method,
+                        elements[i].Usage,
+                        elements[i].UsageIndex
+                    );
+                }
+            }
+
+            decl->Release();
+        }
+    }
+
+    // FVF
+    DWORD fvf = 0;
+    if (SUCCEEDED(device->GetFVF(&fvf)))
+    {
+        printf("FVF: 0x%08X\n", fvf);
+    }
+
+    printf("===========================\n");
+}
+
 namespace dxvk {
 
     class D3D9VR final : public ComObjectClamp<IDirect3DVR9>
@@ -143,14 +254,18 @@ namespace dxvk {
 
             m_device->SetPixelShader(NULL);
             m_device->SetTexture(0, texture);
+
+            m_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
+            m_device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
+
             m_device->SetFVF(FVF_CUSTOM);
 
             static Vertex v[4] =
             {
-                { 0.0f, 0.0f, 0.0f, 1.0f, 0xFFFFFFFF, 0.0f, 0.0f },
-                { 0.0f, 0.0f, 0.0f, 1.0f, 0xFFFFFFFF, 1.0f, 0.0f },
-                { 0.0f, 0.0f, 0.0f, 1.0f, 0xFFFFFFFF, 0.0f, 1.0f },
-                { 0.0f, 0.0f, 0.0f, 1.0f, 0xFFFFFFFF, 1.0f, 1.0f },
+                { 0.0f, 0.0f, 0.0f, 1.0f, 0xFFFF0000, 0.0f, 0.0f },
+                { 0.0f, 0.0f, 0.0f, 1.0f, 0xFFFF0000, 1.0f, 0.0f },
+                { 0.0f, 0.0f, 0.0f, 1.0f, 0xFFFF0000, 0.0f, 1.0f },
+                { 0.0f, 0.0f, 0.0f, 1.0f, 0xFFFF0000, 1.0f, 1.0f },
             };
 
             v[1].x = width;
