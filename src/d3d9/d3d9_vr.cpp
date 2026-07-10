@@ -252,13 +252,25 @@ namespace dxvk {
             if (!texture || !m_device)
                 return;
 
-            m_device->SetPixelShader(NULL);
-            m_device->SetTexture(0, texture);
+            DWORD Alpha, Color, FVF, SrcBlend, DestBlend;
+            IDirect3DPixelShader9* PS;
+            IDirect3DBaseTexture9* Tex;
+            m_device->GetPixelShader(&PS);
+            m_device->GetRenderState(D3DRS_ALPHABLENDENABLE, &Alpha);
+            m_device->GetRenderState(D3DRS_SRCBLEND, &SrcBlend);
+            m_device->GetRenderState(D3DRS_DESTBLEND, &DestBlend);
+            m_device->GetTextureStageState(0, D3DTSS_COLOROP, &Color);
+            m_device->GetFVF(&FVF);
+            m_device->GetTexture(0, &Tex);
+            
 
-            m_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
-            m_device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
-
-            m_device->SetFVF(FVF_CUSTOM);
+            if (PS)  m_device->SetPixelShader(NULL);
+            if (Color != D3DTOP_SELECTARG1) m_device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
+            if (!Alpha) m_device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
+            if (SrcBlend != D3DBLEND_SRCALPHA) m_device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+            if (DestBlend != D3DBLEND_INVSRCALPHA) m_device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+            if (FVF != FVF_CUSTOM) m_device->SetFVF(FVF_CUSTOM);
+            if (Tex != texture) m_device->SetTexture(0, texture);
 
             static Vertex v[4] =
             {
@@ -274,6 +286,17 @@ namespace dxvk {
             v[3].y = height;
 
             m_device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, v, sizeof(Vertex));
+
+            if (PS)  m_device->SetPixelShader(PS);
+            if (Color == 2) m_device->SetTextureStageState(0, D3DTSS_COLOROP, Color);
+            if (!Alpha) m_device->SetRenderState(D3DRS_ALPHABLENDENABLE, Alpha);
+            if (SrcBlend != D3DBLEND_SRCALPHA) m_device->SetRenderState(D3DRS_SRCBLEND, SrcBlend);
+            if (DestBlend != D3DBLEND_INVSRCALPHA) m_device->SetRenderState(D3DRS_DESTBLEND, DestBlend);
+            if (FVF != FVF_CUSTOM) m_device->SetFVF(FVF);
+            if (Tex != texture) m_device->SetTexture(0, Tex);
+
+            if (PS) PS->Release();
+            if (Tex) Tex->Release();
         }
 
     private:
