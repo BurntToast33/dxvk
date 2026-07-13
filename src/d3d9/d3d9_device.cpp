@@ -513,6 +513,8 @@ namespace dxvk {
     {
         pPresentationParameters->BackBufferWidth = g_Game->m_VR->m_RenderWidth;
         pPresentationParameters->BackBufferHeight = g_Game->m_VR->m_RenderHeight;
+
+        g_Game->m_VR->DeviceReset();
     }
 
     D3D9DeviceLock lock = LockDevice();
