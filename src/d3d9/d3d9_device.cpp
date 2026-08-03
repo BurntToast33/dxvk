@@ -683,7 +683,7 @@ namespace dxvk {
     SharedTextureHolder* sharedTexture = nullptr;
     if (g_Game->m_VR && g_Game->m_VR->m_IsInitialized)
     {
-        std::pair<int, SharedTextureHolder*> temp = g_Game->m_VR->PopNextTexture();
+        std::pair<int, SharedTextureHolder*> temp = PopNextTexture();
         isMSAA = temp.first;
         sharedTexture = temp.second;
 
