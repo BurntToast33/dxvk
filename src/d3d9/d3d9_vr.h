@@ -6,9 +6,9 @@
 #include <vulkan/vulkan.h>
 #undef VK_USE_PLATFORM_WIN32_KHR
 
-class IDirect3DVR9;
+struct IDirect3DVR9;
 class D3D9DeviceEx;
-class SharedTextureHolder;
+struct SharedTextureHolder;
 inline IDirect3DVR9 *g_D3DVR9;
 
 namespace vr {

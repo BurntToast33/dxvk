@@ -715,8 +715,8 @@ namespace dxvk {
 
     if (sharedTexture && isMSAA > 0)
     {
-        Game::logMsg(LOGTYPE_DEBUG, "Creating texture with MSAA: %d", g_Game->m_VR->m_AntiAliasing);
-        desc.MultiSample = MapToMultisampleType(g_Game->m_VR->m_AntiAliasing);
+        Game::logMsg(LOGTYPE_DEBUG, "Creating texture with MSAA: %d", g_Game->m_VR->m_Config.m_AntiAliasing);
+        desc.MultiSample = MapToMultisampleType(g_Game->m_VR->m_Config.m_AntiAliasing);
     }
 
 
@@ -4290,7 +4290,7 @@ namespace dxvk {
 
     if (g_Game->m_VR)
     {
-        if (g_Game->m_VR->m_AntiAliasing)
+        if (g_Game->m_VR->m_Config.m_AntiAliasing)
         {
             for (SharedTextureHolder* tex : m_ResolveQueue.m_textures)
             {
