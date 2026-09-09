@@ -319,11 +319,7 @@ namespace dxvk {
 
     g_Game->m_DxDevice = static_cast<D3D9DeviceEx*>(*ppReturnedDeviceInterface);
 
-    if (g_Game && g_Game->m_VrEnabled)
-    {
-        Direct3DCreateVRImpl(*ppReturnedDeviceInterface, &g_D3DVR9);
-    }
-
+    Direct3DCreateVRImpl(*ppReturnedDeviceInterface, &g_D3DVR9);
     return result;
   }
 

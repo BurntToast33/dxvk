@@ -513,9 +513,8 @@ namespace dxvk {
     {
         pPresentationParameters->BackBufferWidth = g_Game->m_VR->m_RenderWidth;
         pPresentationParameters->BackBufferHeight = g_Game->m_VR->m_RenderHeight;
-
-        g_Game->m_VR->DeviceReset();
     }
+    g_Game->DeviceReset();
 
     D3D9DeviceLock lock = LockDevice();
 
@@ -679,17 +678,9 @@ namespace dxvk {
     if (unlikely(ppTexture == nullptr))
       return D3DERR_INVALIDCALL;
 
-    int isMSAA = 0;
-    SharedTextureHolder* sharedTexture = nullptr;
-    if (g_Game->m_VR && g_Game->m_VR->m_IsInitialized)
-    {
-        std::pair<int, SharedTextureHolder*> temp = PopNextTexture();
-        isMSAA = temp.first;
-        sharedTexture = temp.second;
-
-        if (sharedTexture && isMSAA) m_ResolveQueue.RegisterTexture(sharedTexture);
-    }
-
+    std::pair<SharedTextureHolder*, bool> temp = PopNextTexture();
+    SharedTextureHolder* sharedTexture = temp.first;
+    bool msaaSurface = temp.second;
 
     D3D9_COMMON_TEXTURE_DESC desc;
     desc.Width              = Width;
@@ -713,10 +704,11 @@ namespace dxvk {
                             || IsVendorFormat(EnumerateFormat(Format));
 
 
-    if (sharedTexture && isMSAA > 0)
+    if (sharedTexture && sharedTexture->m_MSAALevel && msaaSurface)
     {
-        Game::logMsg(LOGTYPE_DEBUG, "Creating texture with MSAA: %d", g_Game->m_VR->m_Config.m_AntiAliasing);
-        desc.MultiSample = MapToMultisampleType(g_Game->m_VR->m_Config.m_AntiAliasing);
+        Game::logMsg(LOGTYPE_DEBUG, "Creating texture with MSAA: %d", sharedTexture->m_MSAALevel);
+        desc.MultiSample = MapToMultisampleType(sharedTexture->m_MSAALevel);
+        m_ResolveQueue.RegisterTexture(sharedTexture);
     }
 
 
@@ -747,17 +739,17 @@ namespace dxvk {
 
       if (sharedTexture)
       {
-          IDirect3DTexture9*& targetTexture = (isMSAA) ? sharedTexture->m_MSAATexture : sharedTexture->m_Texture;
+          IDirect3DTexture9*& targetTexture = (msaaSurface) ? sharedTexture->m_MSAATexture : sharedTexture->m_Texture;
           targetTexture = *ppTexture;
 
-          IDirect3DSurface9*& targetSurface = (isMSAA) ? sharedTexture->m_MSAASurface : sharedTexture->m_Surface;
+          IDirect3DSurface9*& targetSurface = (msaaSurface) ? sharedTexture->m_MSAASurface : sharedTexture->m_Surface;
           targetTexture->GetSurfaceLevel(0, &targetSurface);
 
-          Rc<DxvkImage>& targetImage = (isMSAA) ? sharedTexture->m_MSAASurfaceImage : sharedTexture->m_SurfaceImage;
+          Rc<DxvkImage>& targetImage = (msaaSurface) ? sharedTexture->m_MSAASurfaceImage : sharedTexture->m_SurfaceImage;
           targetImage = texture->GetCommonTexture()->GetImage();
 
           //Only need to fill other fields for main surface
-          if (!isMSAA)
+          if (g_D3DVR9 && !msaaSurface)
           {
               g_D3DVR9->GetVRDesc(sharedTexture->m_Surface, &sharedTexture->m_VulkanData);
               sharedTexture->m_VRTexture.handle = &sharedTexture->m_VulkanData;
@@ -4288,20 +4280,13 @@ namespace dxvk {
       }
     }
 
-    if (g_Game->m_VR)
+    for (SharedTextureHolder* tex : m_ResolveQueue.m_textures)
     {
-        if (g_Game->m_VR->m_Config.m_AntiAliasing)
-        {
-            for (SharedTextureHolder* tex : m_ResolveQueue.m_textures)
-            {
-                ResolveImage(tex, VK_RESOLVE_MODE_AVERAGE_BIT, VK_RESOLVE_MODE_NONE);
-            }
-        }
-
-        g_Game->m_VR->PreUpdate();
+        ResolveImage(tex, VK_RESOLVE_MODE_AVERAGE_BIT, VK_RESOLVE_MODE_NONE);
     }
-        
 
+    g_Game->PreUpdate();
+    
     HRESULT result = m_implicitSwapchain->Present(
         pSourceRect,
         pDestRect,
@@ -4309,11 +4294,8 @@ namespace dxvk {
         pDirtyRegion,
         dwFlags);
 
-    if (g_Game->m_VR)
-    {
-        g_D3DVR9->WaitDeviceIdle();
-        g_Game->m_VR->PostUpdate();
-    }
+    g_D3DVR9->WaitDeviceIdle();
+    g_Game->PostUpdate();
 
     return result;
   }
